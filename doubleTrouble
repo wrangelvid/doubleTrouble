@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+This module gets the hashes of each file, compares it and returns a json file with files with same hash
+"""
+__author__ = 'David Taschjian'
+import helpers
+import click
+import os
+import json
+import csv
+
+@click.command()
+@click.option('-r', '-R','--recursive', is_flag=True, help = 'Consider sub-directories as well.')
+@click.option('-o', '--output', default = 'duplicates.txt', help = 'Save remaining duplicates into a file. only txt csv and json are supported')
+@click.option('-d', '--delete', is_flag = True, help = 'This is deleting redundant files. Use this with care!')
+@click.option('-t', '--hashtype',default = 'sha1',type=click.Choice(['md5', 'sha1', 'sha256', 'sha384', 'sha512']))
+#TODO check output arguemt for right format option
+@click.argument('rootdir', type=click.Path(exists=True))
+
+def find_duplicates(rootdir, recursive, output, delete, hashtype):
+    """
+    Looking for redundant files by hashing every file in interest.
+    Support recursiv lookups for files in sub-directories.
+    Support removing redundant files.
+    """
+    #This will store the hashvalues as keys and the corresponding files and paths in a list
+    duplicates = {}
+
+
+    click.echo('Fetching files...')
+    #getting totatl directory size and all file paths
+    total_files,dir_size, file_paths = helpers.discover_dir(rootdir, recursive)
+    click.echo(click.style('{} files found'.format(total_files), fg = 'green'))
+
+    #displaying a progressbar
+    bar = click.progressbar(length = dir_size, label= 'hashing files', fill_char='=')
+    for f in file_paths:
+        #hashing file
+        file_hash = helpers.hash_file(f, hashtype)
+        duplicates[file_hash] = duplicates.get(file_hash,[]) + [f]
+        #updaing progessbar
+        bar.update(os.path.getsize(f))
+
+    #new line because progress bar does not create one 
+    click.echo('', nl=True)
+
+    #removing all unique files 
+    click.echo('Processing duplicates...')
+    for to_delete in [hash for hash in duplicates if len(duplicates[hash]) < 2]: del duplicates[to_delete] 
+
+
+    #deleting files if required
+    notDeleted = {}
+    if delete:
+        bar = click.progressbar(length = dir_size, label= 'deleting files', fill_char='=')
+        for key, value in duplicates.items():
+            #delete all files besides first found file
+            for toDelete in value[1:]:
+                #need to determine size in beforehand, because we delete it
+                file_size = os.path.getsize(toDelete)
+                try:
+                    os.remove(toDelete)
+                except:
+                    #couldnt delete file because filesystem did not allow
+                    notDeleted['could not delete'] = notDeleted.get('could not delete',[]) + [toDelete]
+                    click.echo(click.style('could not delete ', fg= 'red') + toDelete)
+                bar.update(file_size)
+        
+    duplicate_count = sum([len(l) for l in list(duplicates.values())]) - len(duplicates.keys())
+    duplicates = {**notDeleted, **duplicates}
+
+    click.echo(click.style('Saving logs...', fg = 'green'))
+    #check if filepath is available
+    output = helpers.available_file(os.path.join(rootdir,output))
+    #save Log
+    helpers.save_dict(output, duplicates)
+
+    click.echo(click.style("We {} {} redundant files!".format('deleted' if delete else 'found', duplicate_count) , fg = 'green'))
+if __name__ == '__main__':
+    find_duplicates()
