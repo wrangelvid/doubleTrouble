@@ -78,6 +78,6 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
     #Notifying the user about outcome
     click.echo(click.style("{} of {} files are redundant!".format(duplicate_count, total_files) , fg = 'green'))
     if delete:
-        click.echo(click.style('Double Trouble removed {} Bytes').format(memory_saved), fg='green')
+        click.echo(click.style('Double Trouble removed {} Bytes'.format(memory_saved), fg='green'))
 if __name__ == '__main__':
     find_duplicates()
