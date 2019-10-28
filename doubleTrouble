@@ -11,7 +11,7 @@ import csv
 
 @click.command()
 @click.option('-r', '-R','--recursive', is_flag=True, help = 'Consider sub-directories as well.')
-@click.option('-o', '--output', default = 'duplicates.txt', help = 'Save remaining duplicates into a file. only txt csv and json are supported')
+@click.option('-o', '--output', default = 'duplicates.txt', help = 'Save remaining duplicates into a file. only txt csv and json are supported', type=click.Path(exists=False))
 @click.option('-d', '--delete', is_flag = True, help = 'This is deleting redundant files. Use this with care!')
 @click.option('-t', '--hashtype',default = 'sha1',type=click.Choice(['md5', 'sha1', 'sha256', 'sha384', 'sha512']))
 #TODO check output arguemt for right format option
@@ -29,7 +29,7 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
 
     click.echo('Fetching files...')
     #getting totatl directory size and all file paths
-    total_files,dir_size, file_paths = helpers.discover_dir(rootdir, recursive)
+    total_files, dir_size, file_paths = helpers.discover_dir(rootdir, recursive)
     click.echo(click.style('{} files found'.format(total_files), fg = 'green'))
 
     #displaying a progressbar
@@ -41,40 +41,43 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
         #updaing progessbar
         bar.update(os.path.getsize(f))
 
-    #new line because progress bar does not create one 
-    click.echo('', nl=True)
-
     #removing all unique files 
     click.echo('Processing duplicates...')
     for to_delete in [hash for hash in duplicates if len(duplicates[hash]) < 2]: del duplicates[to_delete] 
 
+    #deterimine how many redundant files are there
+    duplicate_count = sum([len(l) for l in list(duplicates.values())]) - len(duplicates.keys())
 
     #deleting files if required
     notDeleted = {}
+    memory_saved = 0
     if delete:
-        bar = click.progressbar(length = dir_size, label= 'deleting files', fill_char='=')
+        bar = click.progressbar(length = duplicate_count, label= 'deleting files', fill_char='=')
         for key, value in duplicates.items():
             #delete all files besides first found file
             for toDelete in value[1:]:
                 #need to determine size in beforehand, because we delete it
-                file_size = os.path.getsize(toDelete)
+                memory_saved += os.path.getsize(toDelete)
                 try:
                     os.remove(toDelete)
                 except:
                     #couldnt delete file because filesystem did not allow
                     notDeleted['could not delete'] = notDeleted.get('could not delete',[]) + [toDelete]
                     click.echo(click.style('could not delete ', fg= 'red') + toDelete)
-                bar.update(file_size)
+                bar.update(1)
         
-    duplicate_count = sum([len(l) for l in list(duplicates.values())]) - len(duplicates.keys())
-    duplicates = {**notDeleted, **duplicates}
+    #saving stats to the log
+    duplicates = {**notDeleted, **duplicates,**{'stats':{'total_files':total_files, 'total_size': dir_size, 'redundant_files': duplicate_count, 'memory_saved':memory_saved}}}
 
-    click.echo(click.style('Saving logs...', fg = 'green'))
+    click.echo('Saving logs...')
     #check if filepath is available
     output = helpers.available_file(os.path.join(rootdir,output))
     #save Log
     helpers.save_dict(output, duplicates)
 
-    click.echo(click.style("We {} {} redundant files!".format('deleted' if delete else 'found', duplicate_count) , fg = 'green'))
+    #Notifying the user about outcome
+    click.echo(click.style("{} of {} files are redundant!".format(duplicate_count, total_files) , fg = 'green'))
+    if delete:
+        click.echo(click.style('Double Trouble removed {} Bytes').format(memory_saved), fg='green')
 if __name__ == '__main__':
     find_duplicates()
