@@ -25,7 +25,7 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
     #This will store the hashvalues as keys and the corresponding files and paths in a list
     duplicates = {}
     #Store non hashable filenames here. For instance, that occurs wiht insuficient permissions
-    error_files = [] 
+    not_hashable = [] 
 
 
     click.echo('Fetching files...')
@@ -44,7 +44,7 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
             #Notify user that a file could not be hashed.
             click.echo(click.style('{}: Could not hash'.format(error), fg='red'))
             #store non processed files 
-            error_files.append(f)
+            not_hashable.append(f)
 
         #updaing progessbar
         bar.update(os.path.getsize(f))
@@ -75,7 +75,7 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
                 bar.update(1)
         
     #saving stats and errors to the log
-    duplicates = {**notDeleted, **duplicates,**{'error':error_files},**{'stats':{'total_files':total_files, 'total_size': dir_size, 'redundant_files': duplicate_count, 'memory_saved':memory_saved}}}
+    duplicates = {**notDeleted, **duplicates,**{'could not hash':not_hashable},**{'stats':{'total_files':total_files, 'total_size': dir_size, 'redundant_files': duplicate_count, 'memory_saved':memory_saved}}}
 
     click.echo('Saving logs...')
     #check if filepath is available
