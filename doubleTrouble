@@ -14,7 +14,6 @@ import csv
 @click.option('-o', '--output', default = 'duplicates.txt', help = 'Save remaining duplicates into a file. only txt csv and json are supported', type=click.Path(exists=False))
 @click.option('-d', '--delete', is_flag = True, help = 'This is deleting redundant files. Use this with care!')
 @click.option('-t', '--hashtype',default = 'sha1',type=click.Choice(['md5', 'sha1', 'sha256', 'sha384', 'sha512']))
-#TODO check output arguemt for right format option
 @click.argument('rootdir', type=click.Path(exists=True))
 
 def find_duplicates(rootdir, recursive, output, delete, hashtype):
@@ -25,6 +24,8 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
     """
     #This will store the hashvalues as keys and the corresponding files and paths in a list
     duplicates = {}
+    #Store non hashable filenames here. For instance, that occurs wiht insuficient permissions
+    error_files = [] 
 
 
     click.echo('Fetching files...')
@@ -36,8 +37,15 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
     bar = click.progressbar(length = dir_size, label= 'hashing files', fill_char='=')
     for f in file_paths:
         #hashing file
-        file_hash = helpers.hash_file(f, hashtype)
-        duplicates[file_hash] = duplicates.get(file_hash,[]) + [f]
+        try:
+            file_hash = helpers.hash_file(f, hashtype)
+            duplicates[file_hash] = duplicates.get(file_hash,[]) + [f]
+        except Exception as error:
+            #Notify user that a file could not be hashed.
+            click.echo(click.style('{}: Could not hash'.format(error), fg='red'))
+            #store non processed files 
+            error_files.append(f)
+
         #updaing progessbar
         bar.update(os.path.getsize(f))
 
@@ -53,7 +61,7 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
     memory_saved = 0
     if delete:
         bar = click.progressbar(length = duplicate_count, label= 'deleting files', fill_char='=')
-        for key, value in duplicates.items():
+        for _, value in duplicates.items():
             #delete all files besides first found file
             for toDelete in value[1:]:
                 #need to determine size in beforehand, because we delete it
@@ -66,8 +74,8 @@ def find_duplicates(rootdir, recursive, output, delete, hashtype):
                     click.echo(click.style('could not delete ', fg= 'red') + toDelete)
                 bar.update(1)
         
-    #saving stats to the log
-    duplicates = {**notDeleted, **duplicates,**{'stats':{'total_files':total_files, 'total_size': dir_size, 'redundant_files': duplicate_count, 'memory_saved':memory_saved}}}
+    #saving stats and errors to the log
+    duplicates = {**notDeleted, **duplicates,**{'error':error_files},**{'stats':{'total_files':total_files, 'total_size': dir_size, 'redundant_files': duplicate_count, 'memory_saved':memory_saved}}}
 
     click.echo('Saving logs...')
     #check if filepath is available

@@ -8,32 +8,24 @@ To install click, you can use pip in your shell.
  ```sh
  $ pip install click 
  ```
-# Installtion
-After downling doubleTrouble, the python file must be made executable.
- ```sh
- $ chmod +x doubleTrouble
- ```
 # Usage
 For discovery purposes, run DoubleTrouble in your installation folder and specify a path to a directory where it should look for duplicates.
  ```sh
- $ ./doubleTrouble EXAMPLEPATH
+ $ pyhton3 doubleTrouble EXAMPLEPATH
  ```
 
 To consider sub-directories, use the recursive option.
  ```sh
- $ ./doubleTrouble -r EXAMPLEPATH
+ $ python3 doubleTrouble -r EXAMPLEPATH
  ```
  
 You can get rid of redundant files as well with d for delete.
   ```sh
- $ ./doubleTrouble -d EXAMPLEPATH
+ $ python3 doubleTrouble -d EXAMPLEPATH
  ```
  
  For more options type --help
  
 ```sh
- $ ./doubleTrouble --help
+ $ python3 doubleTrouble --help
 ```
-
-
--by David Taschjian
